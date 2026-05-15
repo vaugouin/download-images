@@ -1,0 +1,21 @@
+.env
+.env.*
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+.venv/
+venv/
+.git/
+.gitignore
+Dockerfile
+README.md
+
+# Not needed in the export image — downloader runs on Windows, CSVs / state
+# are runtime artifacts, doc is reference-only.
+download_images.py
+doc/
+csv/
+state.sqlite
+state.sqlite-*
