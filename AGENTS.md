@@ -7,6 +7,10 @@ This is the single canonical guide for autonomous coding agents in this reposito
 Deeper specs live in their own files:
 - @doc/sql/*.sql — reference DDL for the database schema; treat these files as read-only unless the user explicitly asks you to edit schema documentation
 
+- For any project update, keep documentation aligned:
+  - Update `README.md` for user-facing behavior, configuration, setup, deployment, troubleshooting, or verification changes.
+  - Update this file only when agent workflow or safety context changes.
+
 ---
 
 ## Where things live (file → role)
