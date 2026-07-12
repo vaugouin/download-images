@@ -13,6 +13,24 @@ Deeper specs live in their own files:
 
 ---
 
+## Related repositories (project ecosystem)
+
+`download-images` is one stage of **Agent BBB**, a multi-repository movie/TV database system owned by GitHub user `vaugouin`. All sibling repos live under `%USERPROFILE%/Code/<repo>` and at `github.com/vaugouin/<repo>`; they are interdependent stages of one pipeline that converges on a shared MySQL/MariaDB database (`T_WC_*` tables) and a ChromaDB vector store. The canonical roster of sibling repositories is kept in `doc/related-repositories/related-repositories.txt` in the `tmdb-front` repo.
+
+Pipeline stages:
+- **Infrastructure** — `python` (shared crawler base image), `chromadb` (vector service), `reverseproxy` (NGINX TLS ingress), `chromadb-security-test` (firewall validation).
+- **Acquisition** — `tmdb-crawler`, `imdb-crawler`, `sparql-crawler`, `sparql-movies-persons`, `wikidata-crawler`, `wikipedia-crawler`, `selenium-tmdb`, `download-images`, `sqlite-plex-to-tmdb`, `movieparadise`.
+- **Preprocessing → `T_WC_T2S_*`** — `tmdb-movie-preprocess`, `tmdb-person-preprocess`, `keywords-processing`.
+- **Semantic index & name resolution** — `embedding-update`, `embedding-query`, `rapidfuzz_query`.
+- **Serving** — `fastapi-text2sql` (NL→SQL API + MCP server), `voice-agent`, `tmdb-front` (PHP web front-end).
+- **Evaluation** — `eval-text2sql`, `extract-movie-questions`.
+- **Maintenance & tooling** — `plex-duplicates`, `subtitle-translate`, `powershell`, `playwright-test`.
+- **Monitoring & observability** — `data-monitoring`.
+
+**This repository's role:** Acquisition / asset stage. Mirrors every TMDb image referenced in the database from the TMDb CDN to the local NAS, reading the `T_WC_TMDB_*_IMAGE` tables (movies, series, seasons, episodes, persons, collections, companies, networks). The mirrored images are served by the `tmdb-front` web front-end.
+
+---
+
 ## Where things live (file → role)
 
 Edit at the right layer; the architecture is intentionally split.
@@ -69,5 +87,23 @@ Keep Markdown, prompt files, JSON config, and logs UTF-8. These files contain no
 
 ---
 
-**Last Updated**: 2026-05-15
+## Build & deployment (Docker)
+
+The CSV-export stage is built and run as a Docker container via the repo's `Dockerfile` (base image `python:3.12-slim`). The image installs `requirements-export.txt` and ships only `export_image_tables.py`; `download_images.py` stays Windows-side. The `ENTRYPOINT` is `python -u export_image_tables.py --out /csv`, where `/csv` is a declared `VOLUME` meant to be bind-mounted from the host. Env config (e.g. `CSV_DIR`) is passed via `--env-file`, but `--out /csv` is pinned so output always lands on the bind mount.
+
+---
+
+**Last Updated**: 2026-06-03
 **Current Version**: 1.0.0 
+
+## Backlog (Nestor second-brain)
+
+The prioritized, agent-ready implementation backlog for this repo lives in the **Nestor**
+knowledge repo (a separate repo, not cloned alongside this one):
+
+- This repo: `C:\Users\vaugo\Nestor\projets\t2s-backlog\repos\download-images.md`
+- Cross-repo dashboard: `C:\Users\vaugo\Nestor\projets\t2s-backlog\index.md`
+
+Consult it before implementing: tasks are `DOWNLOAD-IMAGES-NNN` with status (done / in-progress /
+todo), priority, and quick-wins. NOTE: these are local paths on Philippe's PC and do not
+resolve on the VPS or on cloud agents (claude.ai/code).
