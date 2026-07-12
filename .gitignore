@@ -66,3 +66,7 @@ logs/
 citizenphilsecrets.py
 csv/
 state.*
+
+# Claude Code / agent local tooling
+.claude/
+.agents/
