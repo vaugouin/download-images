@@ -18,13 +18,13 @@ Deeper specs live in their own files:
 `download-images` is one stage of **Agent BBB**, a multi-repository movie/TV database system owned by GitHub user `vaugouin`. All sibling repos live under `%USERPROFILE%/Code/<repo>` and at `github.com/vaugouin/<repo>`; they are interdependent stages of one pipeline that converges on a shared MySQL/MariaDB database (`T_WC_*` tables) and a ChromaDB vector store. The canonical roster of sibling repositories is kept in `%USERPROFILE%/Nestor/projets/t2s-backlog/topics/related-repositories.txt` (documentation repo `Nestor`, outside `Code/`).
 
 Pipeline stages:
-- **Infrastructure** — `python` (shared crawler base image), `chromadb` (vector service), `reverseproxy` (NGINX TLS ingress), `chromadb-security-test` (firewall validation), `tools` (host-side operational scripts for the shared MariaDB: backups per perimeter, one-off `.sql` runs; **private repo**, it documents where the database lives and how it is restored).
-- **Acquisition** — `tmdb-crawler`, `imdb-crawler`, `sparql-crawler`, `sparql-movies-persons`, `wikidata-crawler`, `wikipedia-crawler`, `selenium-tmdb`, `download-images`, `sqlite-plex-to-tmdb`, `movieparadise`.
+- **Infrastructure** — `chromadb` (vector service), `reverseproxy` (NGINX TLS ingress), `chromadb-security-test` (firewall validation), `tools` (host-side operational scripts for the shared MariaDB: backups per perimeter, one-off `.sql` runs; **private repo**, it documents where the database lives and how it is restored).
+- **Acquisition** — `tmdb-crawler`, `imdb-crawler`, `sparql-crawler`, `sparql-movies-persons`, `wikidata-crawler`, `wikipedia-crawler`, `selenium-tmdb`, `download-images`, `sqlite-plex-to-tmdb`, `movieparadise`, `open-credits` (crowdsourced OCR of on-screen credits into `T_WC_OC_*`).
 - **Preprocessing → `T_WC_T2S_*`** — `tmdb-movie-preprocess`, `tmdb-person-preprocess`, `keywords-processing`.
 - **Semantic index & name resolution** — `embedding-update`, `embedding-query`, `rapidfuzz_query`.
 - **Serving** — `fastapi-text2sql` (NL→SQL API + MCP server), `voice-agent`, `tmdb-front` (PHP web front-end).
 - **Evaluation** — `text2sql-eval`, `extract-movie-questions`.
-- **Maintenance & tooling** — `plex-duplicates`, `subtitle-translate`, `powershell`, `playwright-test`.
+- **Maintenance & tooling** — `plex-duplicates`, `subtitle-translate`, `powershell`, `playwright-test`, `manual-refresh` (one-entity TMDb + Wikipedia refresh console, formerly `python`).
 - **Monitoring & observability** — `data-monitoring`, `pipeline-3d` (three.js replay of one question's execution trace through `voice-agent` and `fastapi-text2sql`).
 
 **This repository's role:** Acquisition / asset stage. Mirrors every TMDb image referenced in the database from the TMDb CDN to the local NAS, reading the `T_WC_TMDB_*_IMAGE` tables (movies, series, seasons, episodes, persons, collections, companies, networks). The mirrored images are served by the `tmdb-front` web front-end.
@@ -94,7 +94,7 @@ The CSV-export stage is built and run as a Docker container via the repo's `Dock
 ---
 
 **Last Updated**: 2026-10-17
-**Current Version**: 1.0.1
+**Current Version**: 1.0.2
 
 ## Backlog (Nestor second-brain)
 
