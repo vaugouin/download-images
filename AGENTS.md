@@ -91,12 +91,12 @@ Keep Markdown, prompt files, JSON config, and logs UTF-8. These files contain no
 
 The CSV-export stage is built and run as a Docker container via the repo's `Dockerfile` (base image `python:3.12-slim`). The image installs `requirements-export.txt` and ships only `export_image_tables.py`; `download_images.py` stays Windows-side. The `ENTRYPOINT` is `python -u export_image_tables.py --out /csv`, where `/csv` is a declared `VOLUME` meant to be bind-mounted from the host. Env config (e.g. `CSV_DIR`) is passed via `--env-file`, but `--out /csv` is pinned so output always lands on the bind mount.
 
-`off.sh` / `on.sh` rename `tmdb-export.sh` so the next cron tick (07:00) skips it, then restore it. `~/docker/off-all.sh` and `on-all.sh` call them before and after an evaluation campaign or a load test (LOAD-TESTING-003, 2026-10-21).
+`off.sh` writes the flag file `CRON_OFF`, which makes `tmdb-export.sh` exit at once on the next cron tick (07:00), and `on.sh` deletes it (2026-10-25; before, they renamed the script). `~/docker/off-all.sh` and `on-all.sh` call them before and after an evaluation campaign or a load test (LOAD-TESTING-003, 2026-10-21).
 
 ---
 
-**Last Updated**: 2026-10-21
-**Current Version**: 1.0.3
+**Last Updated**: 2026-10-25
+**Current Version**: 1.0.4
 
 ## Backlog (Nestor second-brain)
 
