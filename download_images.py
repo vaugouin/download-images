@@ -28,6 +28,7 @@ import threading
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
+from getpass import getpass
 from pathlib import Path
 from typing import Callable, Iterator
 
@@ -37,6 +38,10 @@ from tqdm import tqdm
 
 
 TMDB_BASE = "https://image.tmdb.org/t/p"
+
+# This script's own folder, used to anchor a relative SSH key path (see
+# resolve_path) the same way sync_vps_docker.py does.
+_SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 
 # Allow csv.reader to handle very large IMAGE_PATH-free strings without blowing
 # up. TMDb paths are short, but be safe against pathological CSVs.
@@ -303,12 +308,30 @@ def _download_one(
 # CSV prefetch from the VPS over SFTP
 # ---------------------------------------------------------------------------
 
+def resolve_path(path: str | None, base: str) -> str | None:
+    """Expand ~ and %VARS%/$VARS in *path*, then anchor a relative one to *base*.
+
+    Ported from sync_vps_docker.py. Paramiko opens ``key_filename`` verbatim: it
+    expands nothing, so ``~/.ssh/id_ed25519`` or ``%USERPROFILE%\\.ssh\\id`` would
+    be taken as a literal filename and auth would fail with a misleading
+    "authentication failed". A relative value resolves against this script's
+    folder, never the shell's current directory.
+    """
+    if not path:
+        return path
+    expanded = os.path.expanduser(os.path.expandvars(path))
+    if not os.path.isabs(expanded):
+        expanded = os.path.join(base, expanded)
+    return os.path.normpath(expanded)
+
+
 def f_fetch_csvs(
     pathlocal: Path,
     strhost: str,
     lngport: int,
     struser: str,
     strkey: str | None,
+    strpassphrase: str | None,
     strpassword: str | None,
     strremote_dir: str,
 ) -> int:
@@ -321,14 +344,22 @@ def f_fetch_csvs(
     Downloads land in a .part file and are atomically renamed on success,
     so a Ctrl-C mid-transfer leaves the previous good CSV in place.
 
+    Authentication mirrors sync_vps_docker.py. When a private key is given, only
+    that key is offered (``look_for_keys=False``, ``allow_agent=False``) so the
+    failure message names the right key. An encrypted key needs its passphrase:
+    paramiko never prompts on its own, it raises PasswordRequiredException, so the
+    passphrase is taken from SSH_KEY_PASSPHRASE for unattended runs, and otherwise
+    typed by the user at a getpass prompt. It can thus stay out of the .env.
+
     Args:
         pathlocal: Local CSV directory (created if missing).
         strhost: SSH host.
         lngport: SSH port.
         struser: SSH user.
-        strkey: Path to a private key, or None to fall back to agent /
-            default keys / SSH_PASSWORD.
-        strpassword: SSH password, or None.
+        strkey: Path to a private key, already resolved (~, %VARS%, relative),
+            or None to fall back to a password.
+        strpassphrase: Passphrase for an encrypted key, or None to be prompted.
+        strpassword: SSH password (no key), or None.
         strremote_dir: Absolute path to the CSV directory on the VPS.
 
     Returns:
@@ -352,10 +383,25 @@ def f_fetch_csvs(
     }
     if strkey:
         arrkwargs["key_filename"] = strkey
-    if strpassword:
+        if strpassphrase:
+            arrkwargs["passphrase"] = strpassphrase
+        # Offer only the key we were given; don't try agent / default keys.
+        arrkwargs["look_for_keys"] = False
+        arrkwargs["allow_agent"] = False
+    elif strpassword:
         arrkwargs["password"] = strpassword
+        arrkwargs["look_for_keys"] = False
+        arrkwargs["allow_agent"] = False
 
-    client.connect(**arrkwargs)
+    try:
+        client.connect(**arrkwargs)
+    except paramiko.PasswordRequiredException:
+        # Encrypted key and no SSH_KEY_PASSPHRASE: ask rather than fail with a
+        # message that says nothing about what is missing.
+        if not strkey:
+            raise
+        arrkwargs["passphrase"] = getpass(f"Passphrase for {strkey}: ")
+        client.connect(**arrkwargs)
     try:
         sftp = client.open_sftp()
         try:
@@ -579,6 +625,7 @@ def main() -> int:
     )
     if not args.no_fetch and strhost:
         try:
+            strkey = os.environ.get("SFTP_KEY") or os.environ.get("SSH_KEY") or None
             lngfetched = f_fetch_csvs(
                 pathlocal=Path(args.csv_dir),
                 strhost=strhost,
@@ -587,7 +634,12 @@ def main() -> int:
                     os.environ.get("SFTP_LOGIN", "").strip()
                     or os.environ.get("SSH_USER", "").strip()
                 ),
-                strkey=os.environ.get("SFTP_KEY") or os.environ.get("SSH_KEY") or None,
+                strkey=resolve_path(strkey, _SCRIPT_DIR),
+                strpassphrase=(
+                    os.environ.get("SFTP_KEY_PASSPHRASE")
+                    or os.environ.get("SSH_KEY_PASSPHRASE")
+                    or None
+                ),
                 strpassword=(
                     os.environ.get("SFTP_PASSWORD")
                     or os.environ.get("SSH_PASSWORD")

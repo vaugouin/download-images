@@ -95,8 +95,8 @@ The CSV-export stage is built and run as a Docker container via the repo's `Dock
 
 ---
 
-**Last Updated**: 2026-10-25
-**Current Version**: 1.0.5
+**Last Updated**: 2026-10-26
+**Current Version**: 1.0.6
 
 ## Backlog (Nestor second-brain)
 

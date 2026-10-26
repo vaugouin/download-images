@@ -121,11 +121,13 @@ python download_images.py --dry-run
 python download_images.py --no-fetch
 ```
 
-**Authentication for the SFTP fetch.** `SSH_KEY` (private key path) takes
-precedence. If it's empty, paramiko falls back to the SSH agent and the
-default keys in `~/.ssh/`. `SSH_PASSWORD` is the last resort. If `SSH_HOST`
-is empty, the fetch is silently skipped and the run proceeds with whatever
-CSVs are present locally.
+**Authentication for the SFTP fetch.** `SSH_KEY` (private key path, accepting
+`~`, `%VARS%` or a path relative to the script) takes precedence and only that
+key is offered (no SSH agent, no default-key scan). If the key is encrypted, its
+passphrase comes from `SSH_KEY_PASSPHRASE`, or is typed at a prompt when that is
+empty, so the passphrase need never live in `.env`. `SSH_PASSWORD` is used only
+when `SSH_KEY` is empty. If `SSH_HOST` is empty, the fetch is silently skipped
+and the run proceeds with whatever CSVs are present locally.
 
 The script is safe to interrupt. Re-running picks up where it left off:
 
