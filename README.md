@@ -85,6 +85,11 @@ docker run --rm --env-file .env -v "$(pwd)/csv:/csv" tmdb-export \
 - If MariaDB runs in another container on the same VPS, attach to that
   network with `--network <name>` and set `DB_HOST=<service-name>`.
 
+On the VPS, cron runs `tmdb-export.sh`, which builds the image as
+`tmdb-export-python-app` and starts it detached with `--network="host"`, unless a
+`tmdb-export` container is already running.
+`off.sh` / `on.sh` switch that cron task off and on through a `CRON_OFF` flag file.
+
 ### Option B — bare Python
 
 ```bash
@@ -137,7 +142,7 @@ The script is safe to interrupt. Re-running picks up where it left off:
 Errors are also logged in `state.sqlite`; inspect with:
 
 ```powershell
-sqlite3 state.sqlite "SELECT table_name, COUNT(*) FROM image_state GROUP BY table_name, status"
+sqlite3 state.sqlite "SELECT table_name, status, COUNT(*) FROM image_state GROUP BY table_name, status"
 sqlite3 state.sqlite "SELECT * FROM image_state WHERE status='error' LIMIT 20"
 ```
 

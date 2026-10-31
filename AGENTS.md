@@ -1,111 +1,64 @@
 # AGENTS.md - Agent Guide for Download Images
 
-This file gives you the agentic context you need to work on this codebase safely. For project overview, features, install / deploy steps and human-facing security / performance / troubleshooting material, read @README.md — that file is canonical and not duplicated here.
-
-This is the single canonical guide for autonomous coding agents in this repository. Assistant-specific files such as @CLAUDE.md, and any future tool-specific guide such as `GEMINI.md`, should only point here and should not duplicate repository instructions.
-
-Deeper specs live in their own files:
-- @doc/sql/*.sql — reference DDL for the database schema; treat these files as read-only unless the user explicitly asks you to edit schema documentation
-
-- For any project update, keep documentation aligned:
-  - Update `README.md` for user-facing behavior, configuration, setup, deployment, troubleshooting, or verification changes.
-  - Update this file only when agent workflow or safety context changes.
+Agent rules only. Overview, NAS layout, setup, both stages, Docker usage and
+Windows notes: @README.md (canonical). Keep it aligned with any behaviour change.
+Reference DDL in [doc/sql/](doc/sql/) (`TMDb-tables.sql`, `Wikipedia-tables.sql`)
+is read-only unless the user asks for schema-doc edits; do not copy table
+definitions here.
 
 ---
 
-## Related repositories (project ecosystem)
+## Role in Agent BBB
 
-`download-images` is one stage of **Agent BBB**, a multi-repository movie/TV database system owned by GitHub user `vaugouin`. All sibling repos live under `%USERPROFILE%/Code/<repo>` and at `github.com/vaugouin/<repo>`; they are interdependent stages of one pipeline that converges on a shared MySQL/MariaDB database (`T_WC_*` tables) and a ChromaDB vector store. The canonical roster of sibling repositories is kept in `%USERPROFILE%/Nestor/projets/t2s-backlog/topics/related-repositories.txt` (documentation repo `Nestor`, outside `Code/`).
+Acquisition / asset stage of the `vaugouin` multi-repo pipeline (shared MariaDB
+`T_WC_*`, ChromaDB). Mirrors every image of the `T_WC_TMDB_*_IMAGE` tables from
+the TMDb CDN to the NAS; `tmdb-front` serves them and `image-captioning` reads
+them (it copies this repo's NAS layout and SQLite state pattern). Sibling roster:
+`%USERPROFILE%/Nestor/projets/t2s-backlog/topics/related-repositories.txt`.
 
-Pipeline stages:
-- **Infrastructure** — `chromadb` (vector service), `reverseproxy` (NGINX TLS ingress), `chromadb-security-test` (firewall validation), `tools` (host-side operational scripts for the shared MariaDB: backups per perimeter, one-off `.sql` runs; **private repo**, it documents where the database lives and how it is restored).
-- **Acquisition** — `tmdb-crawler`, `imdb-crawler`, `sparql-crawler`, `sparql-movies-persons`, `wikidata-crawler`, `wikipedia-crawler`, `selenium-tmdb`, `download-images`, `sqlite-plex-to-tmdb`, `movieparadise`, `open-credits` (crowdsourced OCR of on-screen credits into `T_WC_OC_*`).
-- **Preprocessing → `T_WC_T2S_*`** — `tmdb-movie-preprocess`, `tmdb-person-preprocess`, `keywords-processing`.
-- **Semantic index & name resolution** — `embedding-update`, `embedding-query`, `rapidfuzz_query`.
-- **Serving** — `fastapi-text2sql` (NL→SQL API + MCP server), `voice-agent`, `tmdb-front` (PHP web front-end).
-- **Evaluation** — `text2sql-eval`, `extract-movie-questions`.
-- **Maintenance & tooling** — `plex-duplicates`, `subtitle-translate`, `powershell`, `playwright-test`, `manual-refresh` (one-entity TMDb + Wikipedia refresh console, formerly `python`).
-- **Monitoring & observability** — `data-monitoring`, `pipeline-3d` (three.js replay of one question's execution trace through `voice-agent` and `fastapi-text2sql`).
+Split by design: `export_image_tables.py` runs in Docker on the VPS (the only
+file the image ships); `download_images.py` runs on the Windows PC, which sees
+the NAS but not MariaDB. Do not merge them.
 
-**This repository's role:** Acquisition / asset stage. Mirrors every TMDb image referenced in the database from the TMDb CDN to the local NAS, reading the `T_WC_TMDB_*_IMAGE` tables (movies, series, seasons, episodes, persons, collections, companies, networks). The mirrored images are served by the `tmdb-front` web front-end.
+`off.sh` / `on.sh` toggle the cron launcher `tmdb-export.sh` through a `CRON_OFF`
+flag file (see their header comments); `~/docker/off-all.sh` and `on-all.sh` call
+them around evaluation campaigns and load tests.
 
 ---
-
-## Where things live (file → role)
-
-Edit at the right layer; the architecture is intentionally split.
 
 ## Code conventions
 
-- **Hungarian notation** for variables (legacy style):
-  - `str` — strings (`strtablename`, `strapiversion`)
-  - `lng` — integers (`lngpage`, `lngrowsperpage`)
-  - `dbl` — floats (`dblavailableram`)
-  - `arr` — lists / arrays
-  - `int` — boolean-like flags (`intcleanupenabled`, `intentity`)
-- **Function naming**: public pipeline entry points use `f_` (`f_text2sql`, `f_entity_extraction`, `f_resolve_complex_question`, `f_answer_single_value`, `f_hello_world`); private helpers use `_` (`_call_chat_llm`, `_normalize_llm_model`).
-- **Docstrings**: Google-style on public functions.
-- **Error handling**: broad try/except with console logging; surface failures via the `error` response field and the `messages` trace. Database execution errors are not returned directly to clients — they go through the complex-question retry path when enabled.
-- **JSON serialization**: use `logs.decimal_serializer()` for `Decimal` and `datetime`.
-
----
-
-## Database Schema Sources
-
-Full DDL lives under [doc/sql/](doc/sql/); do not duplicate table definitions here. Treat these files as reference-only unless the user explicitly asks for schema-doc edits.
-
-- [doc/sql/TMDb-tables.sql](doc/sql/TMDb-tables.sql) — upstream/source TMDb tables and reference tables.
-- [doc/sql/Wikipedia-tables.sql](doc/sql/Wikipedia-tables.sql) — Wikipedia section tables.
-
----
+- **Hungarian notation** (legacy style): `str` strings, `lng` integers, `dbl`
+  floats, `arr` lists, `int` boolean-like flags.
+- Public entry points `f_*`, private helpers `_*`; Google-style docstrings on
+  public functions. Broad try/except with console logging.
 
 ## SQL Object Naming Conventions
 
-- SQL table and column names are uppercase snake case, except legacy imported TMDb genre columns such as `id` and `name`.
-- Persistent tables use `T_WC_*`.
-- Text2SQL read-model tables use `T_WC_T2S_*`.
-- TMDb source/reference tables use `T_WC_TMDB_*`.
-- Wikidata tables use `T_WC_WIKIDATA_*`; staging tables use `STG_T_WC_WIKIDATA_*`.
-- Wikipedia tables use `T_WC_WIKIPEDIA_*`.
-- Join tables usually follow `T_WC_T2S_{PARENT}_{CHILD}`, for example `T_WC_T2S_MOVIE_GENRE`, `T_WC_T2S_PERSON_MOVIE`.
-- Primary keys are usually `ID_{ENTITY}` for entity tables, `ID_ROW` for generic/join rows, or a table-specific surrogate such as `ID_T2S_PERSON_MOVIE`.
-- Foreign keys reuse the referenced primary-key name, for example `ID_MOVIE`, `ID_PERSON`, `ID_GENRE`.
-- Date columns use `DAT_*`; datetime/timestamp columns use `TIM_*`.
-- Boolean-like flags use `IS_*` or legacy integer flags such as `DELETED`.
-- Ordering uses `DISPLAY_ORDER`.
-- Aggregate counters use `*_COUNT`.
-- Media paths use `*_PATH`.
-- Language-specific labels/titles often use suffixes such as `_FR`; generic language rows use `LANG`.
-- RapidFuzz/generated search columns use `*_NORM` and `*_KEY`; popularity tie-breakers commonly use `POPULARITY`.
-- Index names are mixed legacy style. Preserve existing style: simple `KEY COLUMN_NAME`, `IDX_*` for indexes, `UK_*` for unique keys, `FK_*` for foreign keys, and `ft_*` for FULLTEXT indexes.
-
----
+- Uppercase snake case (legacy TMDb genre columns `id`, `name` excepted).
+  Prefixes: `T_WC_*` persistent, `T_WC_T2S_*` Text2SQL read model,
+  `T_WC_TMDB_*`, `T_WC_WIKIDATA_*` (staging `STG_T_WC_WIKIDATA_*`),
+  `T_WC_WIKIPEDIA_*`; join tables `T_WC_T2S_{PARENT}_{CHILD}`.
+- PK `ID_{ENTITY}`, `ID_ROW` or a table-specific surrogate; FKs reuse the
+  referenced PK name. Columns: `DAT_*` dates, `TIM_*` timestamps, `IS_*` or legacy
+  `DELETED` flags, `DISPLAY_ORDER`, `*_COUNT`, `*_PATH`, `_FR` suffix / `LANG`,
+  `*_NORM` / `*_KEY` for RapidFuzz, `POPULARITY` tie-breaker.
+- Indexes: preserve the mixed legacy style (`KEY COLUMN_NAME`, `IDX_*`, `UK_*`,
+  `FK_*`, `ft_*`).
 
 ## Encoding
 
-Keep Markdown, prompt files, JSON config, and logs UTF-8. These files contain non-ASCII names and multilingual examples. Avoid editor or terminal operations that rewrite them with mojibake.
+Keep Markdown, JSON and logs UTF-8 (non-ASCII names); avoid tools that rewrite
+files with mojibake.
 
 ---
 
-## Build & deployment (Docker)
-
-The CSV-export stage is built and run as a Docker container via the repo's `Dockerfile` (base image `python:3.12-slim`). The image installs `requirements-export.txt` and ships only `export_image_tables.py`; `download_images.py` stays Windows-side. The `ENTRYPOINT` is `python -u export_image_tables.py --out /csv`, where `/csv` is a declared `VOLUME` meant to be bind-mounted from the host. Env config (e.g. `CSV_DIR`) is passed via `--env-file`, but `--out /csv` is pinned so output always lands on the bind mount.
-
-`off.sh` writes the flag file `CRON_OFF`, which makes `tmdb-export.sh` exit at once on the next cron tick (07:00), and `on.sh` deletes it (2026-10-25; before, they renamed the script). `~/docker/off-all.sh` and `on-all.sh` call them before and after an evaluation campaign or a load test (LOAD-TESTING-003, 2026-10-21).
-
----
-
-**Last Updated**: 2026-10-26
-**Current Version**: 1.0.6
+**Last Updated**: 2026-10-31
+**Current Version**: 1.0.7
 
 ## Backlog (Nestor second-brain)
 
-The prioritized, agent-ready implementation backlog for this repo lives in the **Nestor**
-knowledge repo (a separate repo, not cloned alongside this one):
-
-- This repo: `C:\Users\vaugo\Nestor\projets\t2s-backlog\repos\download-images.md`
-- Cross-repo dashboard: `C:\Users\vaugo\Nestor\projets\t2s-backlog\index.md`
-
-Consult it before implementing: tasks are `DOWNLOAD-IMAGES-NNN` with status (done / in-progress /
-todo), priority, and quick-wins. NOTE: these are local paths on Philippe's PC and do not
-resolve on the VPS or on cloud agents (claude.ai/code).
+Tasks `DOWNLOAD-IMAGES-NNN` (status, priority, quick wins) live in
+`C:\Users\vaugo\Nestor\projets\t2s-backlog\repos\download-images.md`; dashboard
+`...\t2s-backlog\index.md`. Consult before implementing. Local PC paths, not on
+the VPS or cloud agents.
