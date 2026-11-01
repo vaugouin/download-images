@@ -1,5 +1,9 @@
 # AGENTS.md - Agent Guide for Download Images
 
+## Canary
+
+Start every reply with "Philippe,": no exceptions, including short replies and tool summaries.
+
 Agent rules only. Overview, NAS layout, setup, both stages, Docker usage and
 Windows notes: @README.md (canonical). Keep it aligned with any behaviour change.
 Reference DDL in [doc/sql/](doc/sql/) (`TMDb-tables.sql`, `Wikipedia-tables.sql`)
@@ -54,7 +58,7 @@ files with mojibake.
 ---
 
 **Last Updated**: 2026-10-31
-**Current Version**: 1.0.8
+**Current Version**: 1.0.9
 
 ## Backlog (Nestor second-brain)
 
