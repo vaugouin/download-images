@@ -16,7 +16,7 @@ definitions here.
 
 Acquisition / asset stage of the `vaugouin` multi-repo pipeline (shared MariaDB
 `T_WC_*`, ChromaDB). Mirrors every image of the `T_WC_TMDB_*_IMAGE` tables from
-the TMDb CDN to the NAS; `tmdb-front` serves them and `image-captioning` reads
+the TMDb CDN to the NAS; the web front (`t2s-front`, formerly `tmdb-front`) serves them and `image-captioning` reads
 them (it copies this repo's NAS layout and SQLite state pattern). Sibling roster:
 `%USERPROFILE%/Nestor/projets/t2s-backlog/topics/related-repositories.txt`.
 
@@ -58,7 +58,7 @@ files with mojibake.
 ---
 
 **Last Updated**: 2026-10-31
-**Current Version**: 1.0.9
+**Current Version**: 1.0.10
 
 ## Backlog (Nestor second-brain)
 
